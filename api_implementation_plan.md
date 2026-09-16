@@ -11,12 +11,13 @@ backend/
   models/
     source_record.py        # normalized envelope (see §2)
   providers/
-    serpapi.py               # google_news, google_trends, google_search
+    serpapi.py               # google_news, google_trends, google_search, google_autocomplete
     alphavantage.py
     yfinance_provider.py
     sec.py
     fred.py
-    aisstream.py
+    eia.py                   # skippable if no key (see §10b)
+    aisstream.py             # multi-bbox manager, reads chokepoints.json only (see §4e)
   cache/
     cache.py                 # generic get_or_fetch(key, ttl, fetch_fn)
   services/
@@ -24,15 +25,15 @@ backend/
     asset_service.py
     events_service.py
     cross_market_service.py
-    map_service.py
+    map_service.py           # per-chokepoint get_map(id)/get_all_maps, never hardcodes bboxes
   api/
     routes_market.py
     routes_asset.py
     routes_events.py
     routes_crossmarket.py
-    routes_map.py
+    routes_map.py            # GET /api/map + /api/map/{id}, WS /ws/map/{id}
   config.py                  # env vars, SerpApi key-rotation pool
-  main.py                    # app entrypoint, route registration
+  main.py                    # app entrypoint, route registration, AIS lifespan task
 ```
 
 ## 2. Normalized record (unchanged from apis_aaj.md §29 — implement first, everything depends on it)
@@ -58,7 +59,7 @@ Every provider function returns `SourceRecord | list[SourceRecord]`. Services ne
 def get_or_fetch(key: str, ttl_seconds: int, fetch_fn: Callable) -> Any
 ```
 
-Key = `f"{provider}:{dataset}:{normalized_params}:{time_bucket(ttl_seconds)}"`. Backing store: in-memory dict + optional SQLite/Redis if time allows — in-memory with a background sweep is enough for a demo.
+Key = `f"{provider}:{dataset}:{normalized_params}:{time_bucket(ttl_seconds)}"`. Backing store: in-memory dict for API responses (background sweep) + SQLite `backend/data/chokepoints.db` for AIS traffic history (see §9/§11). No Redis/Postgres. In-memory alone is NOT enough — it wipes the 7-day baseline on Render/Railway restart.
 
 TTL table (from apis_aaj.md, keep as-is):
 
@@ -116,22 +117,28 @@ Alpha Vantage primary (has an explicit contract); yfinance as fallback/secondary
 def series(series_id: str) -> SourceRecord   # e.g. 10Y yield, CPI
 ```
 
-### 4e. AISStream (`providers/aisstream.py`) — build in Phase 5 alongside map service
+### 4e. AISStream (`providers/aisstream.py`) — multi-bbox manager, build in Phase 5 alongside map service
+
+> Nothing hardcoded: bboxes come ONLY from `backend/data/curated/chokepoints.json` (`{id, name, bbox, live, commodity_tags}`). Code never contains coordinates.
 
 ```python
-def subscribe_hormuz(on_message: Callable) -> None   # websocket, bounding box only
-def latest_snapshot() -> SourceRecord                 # cached in-memory positions
-def traffic_anomaly() -> SourceRecord                  # count vs 7d rolling baseline
+def load_chokepoints() -> list[dict]          # reads chokepoints.json, filters live:true
+def run_ais_manager(on_update: Callable) -> None   # ONE connection, all live bboxes in one BoundingBoxes array
+def latest_snapshot(chokepoint_id: str) -> SourceRecord        # in-mem positions for one box
+def traffic_anomaly(chokepoint_id: str) -> SourceRecord        # count vs 7d baseline from chokepoints.db
+def most_anomalous() -> SourceRecord          # max |pct_change| across live boxes (drives anomaly strip + agent)
 ```
-Start logging Hormuz traffic the day this goes live — you need real days of data to have a real baseline by demo week, not a placeholder.
+
+Rules: server-side only, `FilterMessageTypes=[PositionReport, ShipStaticData]`, permessage-deflate on, exp-backoff+jitter reconnect, resend replaces subscription (≤1 update/sec), per-MMSI dedup 220ms, batch diff 500ms–3s. Single connection keeps the 3-conn/account+IP budget free.
+Start logging all 5 boxes the day this goes live — you need real days of data to have a real baseline by demo week, not a placeholder.
 
 ## 5. Services — one per screen, compose providers + curated static data
 
-- `market_home_service.get_home()` → indices/FX/rates/commodities/crypto (AV/yfinance) + movers + event ticker (SerpApi news, top N) + **anomaly strip** (combines price delta + news volume delta + trends delta + Hormuz anomaly — all already computed elsewhere, this just aggregates)
-- `asset_service.get_asset(ticker)` → quote/chart/fundamentals (AV) + news timeline (SerpApi news) + **Physical-vs-Narrative panel** (price delta vs attention delta vs physical signal delta — simple normalized comparison, not an LLM call) + **rising-queries badge** and **regional interest strip** (both pulled straight off the same `google_trends` call the panel already makes — no new fetch) + **"what people are asking" panel** (`google_autocomplete`, one new cached call per asset)
-- `events_service.get_events()` → SerpApi news, clustered by simple similarity/topic grouping; `get_event_chain(event_id)` → curated static mapping (event category → commodity → sector → company, hand-authored JSON, not discovered)
-- `cross_market_service.get_matrix()` → curated static sensitivity JSON; `simulate(shock_value)` → scenario slider, just arithmetic over the static matrix
-- `map_service.get_hormuz()` → static chokepoint markers JSON + live AIS snapshot + anomaly %; falls back to last cached snapshot if the websocket is down
+- `market_home_service.get_home()` → indices/FX/rates/commodities/crypto (AV/yfinance) + movers + event ticker (SerpApi news, top N) + **anomaly strip** (combines price delta + news volume delta + trends delta + max chokepoint anomaly via `most_anomalous()` — all already computed elsewhere, this just aggregates)
+- `asset_service.get_asset(ticker)` → quote/chart/fundamentals (AV) + filings/insider (SEC) + news timeline (SerpApi news) + **Physical-vs-Narrative panel** (price delta vs attention delta vs physical signal delta — simple normalized comparison, not an LLM call) + **rising-queries badge** and **regional interest strip** (both pulled straight off the same `google_trends` call the panel already makes — no new fetch) + **"what people are asking" panel** (`google_autocomplete`, one new cached call per asset)
+- `events_service.get_events()` → SerpApi news, clustered by simple similarity/topic grouping (each cluster carries optional `chokepoint_ids` + lat/lon for the map event overlay); `get_event_chain(event_id)` → curated static mapping (event category → commodity → sector → company, hand-authored JSON, not discovered)
+- `cross_market_service.get_matrix()` → curated static sensitivity JSON (solid edges) + SerpApi-discovered dashed candidate edges; `simulate(shock_value)` → scenario slider, just arithmetic over the static matrix, also returns `exposed_chokepoints` for the map highlight
+- `map_service.get_map(chokepoint_id)` → bbox config + live AIS snapshot + anomaly % for ONE box; `get_all_maps()` → all 5 for the map screen + anomaly strip; falls back to per-chokepoint seed snapshot if the websocket is down
 
 ## 6. Routes (FastAPI or equivalent)
 
@@ -141,9 +148,10 @@ GET  /api/asset/{ticker}
 GET  /api/events
 GET  /api/events/{event_id}/chain
 GET  /api/cross-market
-POST /api/cross-market/simulate       # body: {shock_asset, shock_value}
-GET  /api/map/hormuz
-WS   /ws/map/hormuz                   # throttled live vessel updates
+POST /api/cross-market/simulate       # body: {shock_asset, shock_value} → {exposures[], exposed_chokepoints[]}
+GET  /api/map                          # all chokepoints: [{id, count, baseline_7d, pct_change, retrieved_at, stale}]
+GET  /api/map/{chokepoint_id}          # one box: {count, baseline_7d, pct_change, positions[], retrieved_at, stale}
+WS   /ws/map/{chokepoint_id}           # throttled live vessel diffs (2/sec, delta-only, cap ~2000/box)
 ```
 
 ## 7. Env vars (final list)
@@ -161,14 +169,18 @@ MOCK_MODE                ("true" for quota-free video recording, serves warm_cac
 
 ## 9. Locked decisions (Sept 2026 — do not re-debate)
 
-1. **Baseline store = SQLite (stdlib `sqlite3`, no new dep).** File: `backend/data/hormuz.db`. Tables:
+1. **Baseline store = SQLite (stdlib `sqlite3`, no new dep).** File: `backend/data/chokepoints.db` (NOTHING named after one chokepoint). Tables:
    ```sql
+   CREATE TABLE IF NOT EXISTS chokepoint(id TEXT PRIMARY KEY, name TEXT, bbox TEXT, live INT);
    CREATE TABLE IF NOT EXISTS traffic_hour(
-     ts TEXT PRIMARY KEY, vessel_count INT, tanker_count INT, cargo_count INT);
+     chokepoint_id TEXT, ts TEXT,
+     vessel_count INT, tanker_count INT, cargo_count INT,
+     PRIMARY KEY(chokepoint_id, ts));
    CREATE TABLE IF NOT EXISTS positions_cache(
-     mmsi TEXT PRIMARY KEY, lat REAL, lon REAL, type TEXT, updated_at TEXT);
+     chokepoint_id TEXT, mmsi TEXT, lat REAL, lon REAL, sog REAL, cog REAL, type TEXT, updated_at TEXT,
+     PRIMARY KEY(chokepoint_id, mmsi));
    ```
-   Plus bundled fallback `backend/data/seed_baseline.json` (checked in). If DB empty/corrupt/fresh deploy → serve seed + `stale:true`. `scripts/warm_cache.py` backfills DB from seed on boot. Reason: in-memory dict dies on Render/Railway restart and wipes the 7-day baseline.
+   Plus bundled fallback `backend/data/seed_baseline.json` keyed per chokepoint `{id: {baseline_7d, sample_positions}}` (checked in). If DB empty/corrupt/fresh deploy → serve seed + `stale:true` per box. `scripts/warm_cache.py` backfills DB from seed on boot. Reason: in-memory dict dies on Render/Railway restart and wipes the 7-day baseline.
 2. **SEC = INCLUDE via `edgartools` (MIT, `pip install edgartools`).** No key, no quota. Only `SEC_USER_AGENT` + 10 req/sec limit. Only 2 functions (see §10). Huge credibility for Asset screen, ~1 day work.
 3. **EIA = INCLUDE conditionally via `myeia` or plain `requests` (free key, email+ToS).** Only 1 function `series()` over 4 hardcoded IDs (see §10). If `EIA_API_KEY` missing → return `{"status":"skipped"}`; spine still works on AIS alone.
 4. **Single FastAPI process on Render/Railway.** No Postgres, no Redis, no Celery. Background work = `asyncio` tasks in `main.py` lifespan. Frontend choice deferred.
@@ -193,12 +205,13 @@ def series(series_id: str) -> SourceRecord  # raises SkipProvider if no key
 - Cache TTL hours. Called only from `physical_corroborate` for Brent/NatGas queries.
 - `pip install myeia` optional; plain `requests.get("https://api.eia.gov/v2/...", params={"api_key":...})` is fine.
 
-## 11. AIS + map persistence contract
+## 11. AIS + map persistence contract (per chokepoint, config-driven)
 
-- `aisstream.py` subscribes Hormuz bbox only, server-side, exp-backoff+jitter reconnect, message-type filter.
-- In-memory latest positions (per MMSI) flushed to `positions_cache` every 60s AND to `traffic_hour` once/hour.
-- `map_service.get_hormuz()` returns `{count, baseline_7d, pct_change, positions[], retrieved_at, stale: bool}`. `baseline_7d = AVG(vessel_count) last 7d` from SQLite; if <24 rows → use seed file average and set `stale:true`.
-- `scripts/warm_cache.py`: hits every GET once, writes `warm_cache.json` + backfills DB. `MOCK_MODE=true` serves it with zero quota burn for video recording.
+- `aisstream.py` reads live bboxes ONLY from `chokepoints.json`; single server-side connection, exp-backoff+jitter reconnect, message-type filter.
+- In-memory latest positions (per chokepoint+MMSI) flushed to `positions_cache` every 60s AND to `traffic_hour` once/hour per box.
+- `map_service.get_map(id)` returns `{count, baseline_7d, pct_change, positions[], retrieved_at, stale: bool}`. `baseline_7d = AVG(vessel_count) last 7d WHERE chokepoint_id=id`; if <24 rows → use that box's seed average and set `stale:true`. `most_anomalous()` returns the box with max |pct_change|.
+- `scripts/warm_cache.py`: hits every GET (including all 5 map boxes) once, writes `warm_cache.json` + backfills DB. `MOCK_MODE=true` serves it with zero quota burn for video recording.
+- `scripts/prep_geo.py` (one-time): builds committed static layers — `ports.geojson`, `routes.geojson` (OurAirports+OpenFlights), `tss_lanes.geojson`, Overture extract — so map panning never touches a live provider.
 
 ## 12. Consolidated repo layout (create in this order)
 
@@ -208,12 +221,24 @@ backend/providers/serpapi.py alphavantage.py yfinance_provider.py fred.py aisstr
 backend/services/market_home_service.py asset_service.py events_service.py cross_market_service.py map_service.py
 backend/api/routes.py  (split into routes_*.py only past ~300 lines)
 backend/data/curated/tickers.json chokepoints.json sensitivity_matrix.json event_chain.json fred_watchlist.json eia_watchlist.json
-backend/data/hormuz.db  seed_baseline.json  warm_cache.json (generated, git-ignored except seed)
-scripts/warm_cache.py
+backend/data/geo/ports.geojson routes.geojson tss_lanes.geojson  (committed, built by prep_geo.py)
+backend/data/chokepoints.db  seed_baseline.json  warm_cache.json (generated except seed; db+warm git-ignored)
+scripts/warm_cache.py  scripts/prep_geo.py
 research_desk/  (see agentic plan)
 ```
 
-Curated JSON schemas: `sensitivity_matrix.json` = `{shock_asset: [{target, direction: +/-1, weight: 0-1, rationale}]}`; `event_chain.json` = `{category: {commodity, sectors[], companies[]}}`; `chokepoints.json` = `[{id, name, lat, lon, live: bool}]`.
+Curated JSON schemas (only sources of truth — code reads, never hardcodes):
+- `tickers.json` = `{display: {av_symbol, yf_symbol}}` (all symbols here, none in code)
+- `fred_watchlist.json` / `eia_watchlist.json` = `[{id, label, route}]` (all series IDs here)
+- `sensitivity_matrix.json` = `{shock_asset: [{target, direction: +/-1, weight: 0-1, rationale}]}`
+- `event_chain.json` = `{category: {commodity, sectors[], companies[]}}`
+- `chokepoints.json` = `[{id, name, bbox: [[lat,lon],[lat,lon]], live: bool, commodity_tags: []}]` (all coordinates here)
+
+## 15. Peak map rendering spec (frontend, no new backend routes)
+
+- Stack: MapLibre GL JS + `@deck.gl/maplibre` `MapLibreOverlay (interleaved:true)` on Carto Dark Matter (+Seamap/Seascape nautical style).
+- Layers off the SAME `GET /api/map[/{id}]` + `WS /ws/map/{id}` data: `ScatterplotLayer` dots (tanker/cargo/other) + glow ring + `TripsLayer` 4-min trails + `PathLayer` heading stubs (len ∝ SOG) + `ArcLayer` trade arcs + event dots + crossings mini-chart + 30-day playback. Canvas only, viewport culling, dead-reckoning between pings.
+- Scenario highlight: `POST /simulate → exposed_chokepoints[]` drives map emphasis. No extra fetch.
 
 ## 13. Ops checklist (Render/Railway)
 
@@ -229,8 +254,8 @@ Curated JSON schemas: `sensitivity_matrix.json` = `{shock_asset: [{target, direc
 3. `sec.py` (2 fns) → wire filings/insider badges into Asset (cheap, do alongside 2)
 4. `events_service` (clustering + curated chain JSON) → **Events screen live**
 5. `cross_market_service` (static matrix + simulate) → **Cross-Market screen live**
-6. `aisstream.py` + SQLite baseline + `map_service` (with seed fallback) → **Map screen live**
+6. `aisstream.py` (multi-bbox manager) + SQLite per-chokepoint baseline + `map_service` (with per-box seed fallback) + `prep_geo.py` static layers → **Map screen live**
 7. `eia.py` (1 fn, skippable) → wire into `physical_corroborate` only
-8. Anomaly strip on Market Home (pulls from services already built in 2–6, no new provider work)
+8. Anomaly strip on Market Home (uses `most_anomalous()`, no new provider work)
 
 Everything through step 6 is required for the Hero-1 demo spine. Steps 7–8 are the first §5 "small additions" — only after 1–6 are demo-clean.

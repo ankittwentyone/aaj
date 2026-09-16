@@ -18,7 +18,7 @@ Brent moves
    → Asset screen shows PHYSICAL vs NARRATIVE verdict
    → click "WHY IS THIS MOVING?"
    → Research Desk runs (visible stages, visible SerpApi calls)
-   → World Map shows Hormuz tanker traffic vs 7-day baseline
+   → World Map shows most-anomalous chokepoint tanker traffic vs 7-day baseline
    → Cross-Market panel shows exposed sectors
    → cited report renders
 ```
@@ -34,30 +34,34 @@ If a feature doesn't serve this spine, it's not in the MVP.
 | **Market Home** | Indices, FX, rates, commodities, crypto, movers, event ticker. Includes a persistent **anomaly strip** (see §5) — not a separate Signals screen. |
 | **Asset / Company** | Price/chart, fundamentals, news timeline, Physical-vs-Narrative verdict panel, "WHY IS THIS MOVING?" button. |
 | **Events / News** | Headline clusters, timeline, click-through to affected commodity/sector/company chain. |
-| **World Map** | ONE chokepoint (Strait of Hormuz) with live layer. Spec in §3. |
-| **Cross-Market Matrix** | Curated, human-authored sensitivity matrix (not an auto-discovered graph). Includes scenario slider (see §5). |
-| **Research Desk** | Fixed-pipeline agent, reusing existing Hermes + DeepSeek harness. Spec in §4. |
+| **World Map** | FIVE live chokepoints (Hormuz, Bab el-Mandeb, Suez, Malacca, Panama) + peak rendering (deck.gl trails/arcs). Spec in §3. |
+| **Cross-Market Matrix** | Curated, human-authored sensitivity matrix (not an auto-discovered graph) + SerpApi-discovered dashed candidate edges. Includes scenario slider (see §5). |
+| **Research Desk** | Fixed-pipeline LangGraph agent (open_deep_research scaffold) + DeepSeek. Hermes retired. Spec in §4. |
 
 ## 3. World Map — build spec (good to go)
 
+> Rule: NOTHING about chokepoints is hardcoded in code. Bboxes, names, live flags live ONLY in `backend/data/curated/chokepoints.json`. Adding a 6th chokepoint = one JSON entry + seed row, zero code change.
+
+**Config (`chokepoints.json`, the only source of truth):**
+- 5 live entries: Hormuz `[[24.5,55.5],[27.0,57.5]]`, Bab el-Mandeb `[[11.5,42.5],[13.5,44.5]]`, Suez approach+canal `[[27.5,32.0],[31.8,34.0]]`, Malacca+Singapore `[[1.0,98.0],[6.5,104.5]]`, Panama both mouths `[[7.5,-80.5],[9.8,-77.5]]` (refine corners at implementation time, commit the file).
+- Schema per entry: `{id, name, bbox: [[lat,lon],[lat,lon]], live: bool, commodity_tags: [...]}`.
+
 **Base layer:**
-- MapLibre GL JS + a free, no-key vector tile source (e.g. OpenFreeMap) — zero rate-limit risk, no API key management, includes place labels/coastlines out of the box.
-- No Overpass/OSM POI queries needed for MVP — base tiles already carry enough geography. Skip that P1 work entirely.
+- MapLibre GL JS + free no-key dark style (Carto Dark Matter primary, OpenFreeMap fallback). Nautical feel via Seamap seamarks + Seascape bathymetry style add-on — one style change, huge visual payoff.
+- No live Overpass queries ever. Static geo is pre-ingested once and committed: OSM ports (HOT/Geofabrik → GeoJSON), OurAirports + OpenFlights routes, Overture transport/places GeoParquet via DuckDB, hand-drawn `tss_lanes.geojson` (Hormuz/Malacca TSS). Script: `scripts/prep_geo.py`.
 
-**Static context layer:**
-- Hardcoded JSON: chokepoint markers (Hormuz, Suez, Malacca, Panama) as *labeled dots only* — cheap, adds visual credibility that "the world" exists beyond your one live spot, zero engineering cost.
+**Live layer (all 5, ONE AISStream connection):**
+- Single server-side websocket, all 5 bboxes in one `BoundingBoxes` array (`FilterMessageTypes: [PositionReport, ShipStaticData]`, permessage-deflate on). 3-conn limit stays untouched for headroom. Exp-backoff+jitter reconnect; resend replaces subscription (max 1 update/sec).
+- Pipeline: per-MMSI dedup (220ms throttle) → in-mem store → batch diff every 500ms–3s → SQLite hourly rollup per chokepoint + snapshot file. Baseline = `AVG(vessel_count)` trailing 7d per chokepoint from `chokepoints.db`; start logging Day 1.
+- Frontend rendering (canvas only, never DOM markers): deck.gl `MapLibreOverlay (interleaved:true)` with `ScatterplotLayer` dots (tanker/cargo/other colors) + glow ring + `TripsLayer` 4-min comet trails + `PathLayer` heading stubs sized by SOG + `ArcLayer` trade-flow arcs (UN Comtrade targeted queries) + event dots (geocoded SerpApi news). Dead-reckoning between pings, viewport culling, WS capped ~2000 vessels/box at 2 msgs/sec.
+- Click vessel/chokepoint → side panel: current count, baseline, % change, linked markets (from sensitivity matrix), related events. Scenario slider highlights exposed chokepoints/sectors on the map.
+- Crossings mini-chart per chokepoint (inbound/outbound bars via two-zone state machine, 18h window) + 30-day timeline playback control.
 
-**Live layer (Hormuz only):**
-- AISStream websocket, subscribed to Hormuz bounding box only.
-- In-memory latest-position cache per vessel (MMSI), throttled render (batch every few seconds, not per-message).
-- Vessel markers color-coded by type (tanker/cargo/other).
-- Traffic count in box vs a **7-day rolling baseline** — start logging this the day you turn the feed on, so by demo week you have a real baseline, not a placeholder number.
-- Click a vessel/chokepoint → side panel: current count, baseline, % change, linked markets (pull straight from the Cross-Market curated matrix — no new data needed).
+**Demo safety (non-negotiable, per chokepoint):**
+- Persist snapshot + anomaly % per chokepoint every 60s. Socket drop → render seed + `stale:true`, never empty map. Socket-kill test is a merge gate.
+- Static layers + seed render with zero live data — map looks complete even offline.
 
-**Demo safety (non-negotiable):**
-- Cache last-known-good snapshot (positions + computed anomaly %) on an interval. If the AISStream socket drops mid-demo, render from cache instead of an empty/error map. This is the single highest-value defensive line item on the whole map — build it early, not as an afterthought.
-
-**Explicitly cut:** aviation layer, weather layer, wildfire/earthquake layers, any chokepoint beyond Hormuz getting live data.
+**Explicitly cut:** full aviation network product, weather/disaster as standalone screens (allowed ONLY as cheap map layer toggles off free feeds: OpenSky selected hubs, Open-Meteo at ports, FIRMS/USGS/GDACS dots — no new screens, no new routes).
 
 ## 4. Research Desk — build spec
 
@@ -72,7 +76,7 @@ Built on LangGraph via the `langchain-ai/open_deep_research` scaffold, with Deep
                                      specific follow-up query based on
                                      stage 3/4 output (this is the one
                                      place real agentic choice lives)
-6. Physical/macro corroboration   — EIA / AISStream anomaly number
+6. Physical/macro corroboration   — EIA / multi-chokepoint AIS anomaly (most-anomalous box) / FRED
 7. Synthesis                      — single LLM call → cited report
 ```
 
@@ -86,8 +90,8 @@ These are worth adding — not scope creep, near-zero marginal data work:
 
 - **Command palette** (global search/jump bar: `AAPL`, `BRENT`, `WHY OIL?`, `HORMUZ`) — pure frontend routing over screens you're already building. Big "feels like a real terminal" payoff for the cost.
 - **Evidence hover cards** — any number/claim on any screen expands to source + timestamp on hover. Small UI component, reused everywhere, directly reinforces "cited" positioning judges will notice.
-- **Anomaly strip on Market Home** — a persistent ticker combining price move + news intensity + trends spike + Hormuz traffic delta, all data you already have from the Hero-1 pipeline. Replaces the cut Signals screen entirely — same signal, zero new data layer.
-- **Scenario slider on Cross-Market Matrix** — "Brent = $120 →" recomputes exposure using your curated static sensitivities. It's just arithmetic over data you already authored; looks like real analytics.
+- **Anomaly strip on Market Home** — a persistent ticker combining price move + news intensity + trends spike + max chokepoint traffic delta across all 5 boxes, all data you already have from the Hero-1 pipeline. Replaces the cut Signals screen entirely — same signal, zero new data layer.
+- **Scenario slider on Cross-Market Matrix** — "Brent = $120 →" recomputes exposure using your curated static sensitivities AND highlights exposed chokepoints/sectors on the map. It's just arithmetic over data you already authored; looks like real analytics.
 
 ### Moat-proving additions (these directly demonstrate §0's pitch — treat as near-required, not optional polish)
 
@@ -97,7 +101,7 @@ These are worth adding — not scope creep, near-zero marginal data work:
 
 ## 6. Explicitly NOT in MVP
 
-Physical Markets screen, standalone Signals screen, India Lens, Morning Memo, aviation/weather/disaster map layers, multi-chokepoint live data, auto-discovered relationship graph, portfolio/backtesting/auth, any SerpApi engine beyond `google_news` / `google_trends` / `google_search` (Shopping/Jobs/Patents/Maps stay P2, add only if a checkpoint shows spare time).
+Physical Markets screen, standalone Signals screen, India Lens, Morning Memo, auto-discovered relationship graph (candidate dashed edges allowed, see §2), portfolio/backtesting/auth, any SerpApi engine beyond `google_news` / `google_trends` / `google_search` (+ `google_autocomplete` for the asking panel).
 
 ## 7. SerpApi usage
 
@@ -109,8 +113,8 @@ Engines: `google_news`, `google_trends`, `google_search`, `google_autocomplete`.
 |---|---|---|
 | 1 | Data adapters (SerpApi, Alpha Vantage, SEC, FRED) + caching | Deterministic screens renderable |
 | 2 | Market Home + Asset + Events (frontend) | Hero-1 narrative walkable without map/agent |
-| 3 | Map: base tiles + Hormuz AISStream + fallback cache | Map screen demo-safe |
-| 4 | Research Desk retrofit (Hermes/DeepSeek → fixed pipeline) + search trace panel | End-to-end Hero-1 works live |
+| 3 | Map: base + static geo + 5-box AIS + per-chokepoint fallback + deck.gl layers | Map screen demo-safe |
+| 4 | Research Desk (LangGraph scaffold + DeepSeek, Hermes retired) + search trace panel | End-to-end Hero-1 works live |
 | 5 | Small additions (§5) — **only if Phase 1–4 are solid** | Polish |
 
 Checkpoint at ~day 10–12: if Phase 1–4 aren't demo-clean, §5 gets cut before anything else does.
@@ -118,6 +122,6 @@ Checkpoint at ~day 10–12: if Phase 1–4 aren't demo-clean, §5 gets cut befor
 ## 9. Judging-criteria mapping (for the written explanation / repo README)
 
 - **Idea strength / originality** — physical-world → market causality, not a stock dashboard with an LLM button.
-- **Technical complexity** — multi-provider adapter layer, live AIS anomaly detection, curated sensitivity matrix, retrofit agent pipeline with bounded tool use.
+- **Technical complexity** — multi-provider adapter layer, 5-box live AIS anomaly detection, curated sensitivity matrix + candidate edges, retrofit agent pipeline with bounded tool use.
 - **Usefulness** — Physical-vs-Narrative verdict is an analytic output, not an opinion; evidence hover cards make every claim checkable.
 - **Meaningful SerpApi usage** — news (catalyst discovery), trends (attention signal), search (agent research) — structurally load-bearing, shown live via the search trace panel, explained explicitly in the README per the competition's stated preference.

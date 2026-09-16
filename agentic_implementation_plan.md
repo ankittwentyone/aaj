@@ -113,7 +113,7 @@ This event stream is simultaneously the "Searching news... Checking trends..." n
 2. Wire `resolve` + `market_pull` to the real API-layer services (needs API plan Phase 2 done first).
 3. Wire `news_search` + `trends_search` to `serpapi_tool.py`.
 4. `decide_followup` + `web_search` — the one real agentic branch.
-5. `physical_corroborate` — wire to `map_service`/FRED once API plan Phase 5 is done.
+5. `physical_corroborate` — wire to `map_service.most_anomalous()`/per-box anomaly + FRED/EIA once API plan Phase 5 is done (pass the most-anomalous chokepoint id + pct into evidence, not just one hardcoded box).
 6. `synthesize` — prompt + evidence-linking.
 7. `stream.py` — WS endpoint + frontend trace panel wiring.
 8. Guardrails pass: add timeouts/fallbacks to every node explicitly (don't assume they're fine — test each one by intentionally breaking its upstream provider).

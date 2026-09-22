@@ -1,0 +1,5 @@
+[
+  {"id": "DGS10", "label": "10Y Treasury Yield", "route": "series/observations"},
+  {"id": "CPIAUCSL", "label": "CPI", "route": "series/observations"},
+  {"id": "FEDFUNDS", "label": "Fed Funds", "route": "series/observations"}
+]

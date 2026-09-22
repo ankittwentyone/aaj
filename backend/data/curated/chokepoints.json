@@ -1,0 +1,7 @@
+[
+  {"id": "hormuz", "name": "Strait of Hormuz", "bbox": [[24.5, 55.5], [27.0, 57.5]], "live": true, "commodity_tags": ["BRENT", "WTI", "NATGAS"]},
+  {"id": "bab-el-mandeb", "name": "Bab el-Mandeb", "bbox": [[11.5, 42.5], [13.5, 44.5]], "live": true, "commodity_tags": ["BRENT", "WTI"]},
+  {"id": "suez", "name": "Suez Canal Approach", "bbox": [[27.5, 32.0], [31.8, 34.0]], "live": true, "commodity_tags": ["BRENT", "WTI", "NATGAS"]},
+  {"id": "malacca", "name": "Malacca + Singapore", "bbox": [[1.0, 98.0], [6.5, 104.5]], "live": true, "commodity_tags": ["BRENT", "WTI", "COPPER"]},
+  {"id": "panama", "name": "Panama Canal", "bbox": [[7.5, -80.5], [9.8, -77.5]], "live": true, "commodity_tags": ["WTI", "NATGAS", "COPPER"]}
+]

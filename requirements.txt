@@ -1,0 +1,9 @@
+fastapi>=0.110
+uvicorn[standard]>=0.29
+requests>=2.31
+yfinance>=0.2.40
+edgartools>=3.0
+websockets>=12.0
+python-dotenv>=1.0
+langgraph>=1.0
+langchain-deepseek>=1.0

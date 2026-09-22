@@ -1,0 +1,18 @@
+{
+  "SPX": {"av_symbol": "SPY", "yf_symbol": "SPY"},
+  "NDX": {"av_symbol": "QQQ", "yf_symbol": "QQQ"},
+  "BRENT": {"av_symbol": "BZ=F", "yf_symbol": "BZ=F"},
+  "WTI": {"av_symbol": "CL=F", "yf_symbol": "CL=F"},
+  "GOLD": {"av_symbol": "GLD", "yf_symbol": "GLD"},
+  "COPPER": {"av_symbol": "CPER", "yf_symbol": "HG=F"},
+  "NATGAS": {"av_symbol": "UNG", "yf_symbol": "NG=F"},
+  "AAPL": {"av_symbol": "AAPL", "yf_symbol": "AAPL"},
+  "MSFT": {"av_symbol": "MSFT", "yf_symbol": "MSFT"},
+  "XOM": {"av_symbol": "XOM", "yf_symbol": "XOM"},
+  "CVX": {"av_symbol": "CVX", "yf_symbol": "CVX"},
+  "EURUSD": {"av_symbol": "EURUSD", "yf_symbol": "EURUSD=X"},
+  "USDINR": {"av_symbol": "USDINR", "yf_symbol": "USDINR=X"},
+  "BTC": {"av_symbol": "BTCUSD", "yf_symbol": "BTC-USD"},
+  "ETH": {"av_symbol": "ETHUSD", "yf_symbol": "ETH-USD"},
+  "US10Y": {"av_symbol": "TNX", "yf_symbol": "^TNX"}
+}

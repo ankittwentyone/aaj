@@ -1,0 +1,15 @@
+{
+  "BRENT": [
+    {"target": "XOM", "direction": 1, "weight": 0.85, "rationale": "Integrated oil majors track crude with high beta."},
+    {"target": "CVX", "direction": 1, "weight": 0.82, "rationale": "Chevron leverage to upstream realizations."},
+    {"target": "US10Y", "direction": 1, "weight": 0.45, "rationale": "Oil-driven inflation expectations push yields."},
+    {"target": "USDINR", "direction": 1, "weight": 0.35, "rationale": "India oil import bill pressures INR."}
+  ],
+  "WTI": [
+    {"target": "XOM", "direction": 1, "weight": 0.8, "rationale": "US upstream exposure."},
+    {"target": "BRENT", "direction": 1, "weight": 0.95, "rationale": "Global crude arb linkage."}
+  ],
+  "NATGAS": [
+    {"target": "US10Y", "direction": 0.2, "weight": 0.2, "rationale": "Weak linkage via energy inflation tail."}
+  ]
+}

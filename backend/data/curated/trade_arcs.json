@@ -1,0 +1,8 @@
+[
+  {"from": [25.7, 56.5], "to": [3.5, 100.5], "commodity": "BRENT", "label": "Gulf -> Singapore crude"},
+  {"from": [25.7, 56.5], "to": [30.5, 32.8], "commodity": "BRENT", "label": "Gulf -> Suez crude"},
+  {"from": [12.6, 43.4], "to": [30.5, 32.8], "commodity": "WTI", "label": "Red Sea -> Suez products"},
+  {"from": [3.5, 100.5], "to": [8.8, -79.5], "commodity": "COPPER", "label": "Asia -> Panama dry bulk"},
+  {"from": [30.5, 32.8], "to": [36.0, 10.0], "commodity": "NATGAS", "label": "Suez -> Med LNG"},
+  {"from": [8.8, -79.5], "to": [29.0, -89.0], "commodity": "NATGAS", "label": "Panama -> US Gulf LNG"}
+]

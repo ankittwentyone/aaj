@@ -1,0 +1,6 @@
+{
+  "geopolitical": {"commodity": "BRENT", "sectors": ["Energy", "Airlines", "Chemicals"], "companies": ["XOM", "CVX"]},
+  "supply-disruption": {"commodity": "BRENT", "sectors": ["Energy", "Refining"], "companies": ["XOM", "CVX"]},
+  "opec": {"commodity": "BRENT", "sectors": ["Energy"], "companies": ["XOM", "CVX"]},
+  "default": {"commodity": "BRENT", "sectors": ["Energy"], "companies": ["XOM"]}
+}

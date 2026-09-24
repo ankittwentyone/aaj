@@ -1,6 +1,6 @@
 [
-  {"id": "WTTSTUS1", "label": "US Crude Stocks (placeholder route — verify via EIA API browser)", "route": "v2/petroleum/stoc/wstk/data"},
-  {"id": "WCRFPUS2", "label": "US Crude Production (placeholder route — verify via EIA API browser)", "route": "v2/petroleum/sum/sndw/data"},
-  {"id": "W_REFINERY_UTIL", "label": "Refinery Utilization (placeholder route — verify via EIA API browser)", "route": "v2/petroleum/sum/sndw/data"},
-  {"id": "W_NATGAS_STORAGE", "label": "Nat Gas Storage (placeholder route — verify via EIA API browser)", "route": "v2/natural-gas/stor/wk/data"}
+  {"id": "WTTSTUS1", "label": "US Crude Stocks (verified live 2026-09-24, 1916 rows)", "route": "v2/petroleum/stoc/wstk/data"},
+  {"id": "WCRFPUS2", "label": "US Crude Production (verified live 2026-09-24, 2278 rows)", "route": "v2/petroleum/sum/sndw/data"},
+  {"id": "W_REFINERY_UTIL", "label": "Refinery Utilization (INVALID series 2026-09-24: total 0, graceful skip)", "route": "v2/petroleum/sum/sndw/data"},
+  {"id": "W_NATGAS_STORAGE", "label": "Nat Gas Storage (INVALID route 2026-09-24: 400, graceful skip)", "route": "v2/natural-gas/stor/wk/data"}
 ]

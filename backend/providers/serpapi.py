@@ -129,18 +129,18 @@ def google_news(query: str, num: int = 10) -> list:
 
 def google_trends(query: str, geo: str | None = None) -> dict:
     """Retain FULL raw response — rising + regional fields live here."""
-    params = {"q": query, "geo": geo}
-    key = cache_key("serpapi", "google_trends", params, _TTLS["google_trends"])
+    # Wire params are the canonical replay key (must match warm_cache.SERPAPI_RECORDS).
+    wire = {"q": query, "data_type": "TIMESERIES"}
+    if geo:
+        wire["geo"] = geo
+    key = cache_key("serpapi", "google_trends", wire, _TTLS["google_trends"])
 
     def fetch():
-        m = _mock("google_trends", params)
+        m = _mock("google_trends", wire)
         if m is not None:
             raw = m
         else:
-            p = {"q": query, "data_type": "TIMESERIES"}
-            if geo:
-                p["geo"] = geo
-            raw = _pool().call("google_trends", p)
+            raw = _pool().call("google_trends", dict(wire))
         return make_record(
             provider="serpapi",
             dataset="google_trends",
@@ -157,7 +157,9 @@ def google_search(query: str, num: int = 5) -> list:
 
     def fetch():
         m = _mock("google_search", params)
-        raw = m if m is not None else _pool().call("google_search", {"q": query, "num": num})
+        # SerpApi wire engine is "google" (organic); "google_search" is our
+        # dataset/cache label. Verified live 2026-09-24: engine google_search 400s.
+        raw = m if m is not None else _pool().call("google", {"q": query, "num": num})
         items = raw.get("organic_results", []) if isinstance(raw, dict) else []
         out = []
         for it in items[:num]:

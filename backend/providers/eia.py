@@ -1,10 +1,10 @@
 """EIA — built with graceful skip. Spec §10b. One function series().
 
 MVP watchlist: backend/data/curated/eia_watchlist.json (4 IDs).
-Exact v2 routes resolved at implementation time via API browser; route recorded
-in watchlist + verification date in comment below.
-Verified: 2026-09-17 — routes are placeholders; confirm against
-https://www.eia.gov/opendata/browser before demo week.
+Verified live 2026-09-24: WTTSTUS1 (1916 rows) + WCRFPUS2 (2278 rows) return 200;
+W_REFINERY_UTIL returns total 0 (invalid series); W_NATGAS_STORAGE 400 (bad route).
+Broken IDs degrade to {"status":"skipped"}; hot path (physical_corroborate WTTSTUS1)
+is live. Spine works on AIS alone.
 If EIA_API_KEY missing -> {"status":"skipped"}; spine still works on AIS alone.
 """
 from __future__ import annotations

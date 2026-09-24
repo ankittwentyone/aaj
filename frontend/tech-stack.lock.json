@@ -1,0 +1,86 @@
+{
+  "name": "aaj-terminal-frontend",
+  "lockfileVersion": 3,
+  "packageManager": "pnpm@9.12.3",
+  "note": "Decisive pin table mirrors plan 12_TECH_STACK_LOCK.md §1. Exact (=) not ^. Import paths locked. Bundle costs per §1.",
+  "dependencies": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-router-dom": "7.1.5",
+    "maplibre-gl": "5.5.0",
+    "react-map-gl": "8.0.4",
+    "@deck.gl/core": "9.1.14",
+    "@deck.gl/layers": "9.1.14",
+    "@deck.gl/mapbox": "9.1.14",
+    "@deck.gl/extensions": "9.1.14",
+    "@deck.gl/aggregation-layers": "9.1.14",
+    "lightweight-charts": "5.0.8",
+    "@tanstack/react-query": "5.90.2",
+    "lucide-react": "0.469.0",
+    "clsx": "2.1.1",
+    "tailwind-merge": "3.3.1",
+    "class-variance-authority": "0.7.1",
+    "date-fns": "3.6.0",
+    "zod": "3.23.8"
+  },
+  "optionalDependencies": {
+    "framer-motion": "12.23.12"
+  },
+  "devDependencies": {
+    "vite": "8.0.4",
+    "@vitejs/plugin-react": "4.3.4",
+    "tailwindcss": "4.1.3",
+    "@tailwindcss/vite": "4.1.3",
+    "typescript": "5.7.3",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@types/maplibre-gl": "1.12.0",
+    "msw": "2.7.4",
+    "vitest": "3.1.3",
+    "@testing-library/react": "16.2.0",
+    "playwright": "1.51.0",
+    "bundlesize": "1.0.1",
+    "@radix-ui/react-hover-card": "1.1.2",
+    "d3-scale": "4.0.2",
+    "d3-array": "3.2.4",
+    "d3-hierarchy": "3.1.2",
+    "@fontsource/geist": "5.0.3",
+    "@fontsource/geist-mono": "5.0.3"
+  },
+  "banned": [
+    "zustand",
+    "nuqs",
+    "recharts",
+    "chart.js",
+    "html2canvas",
+    "leaflet",
+    "d3",
+    "@floating-ui/react",
+    "miragejs",
+    "jest",
+    "prettier",
+    "geist",
+    "deck.gl"
+  ],
+  "overrides": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "bundlesize": [
+    { "path": "dist/assets/vendor-*.js", "maxSize": "80 kB" },
+    { "path": "dist/assets/map-*.js", "maxSize": "180 kB" },
+    { "path": "dist/assets/chart-*.js", "maxSize": "30 kB" },
+    { "path": "dist/assets/*.js", "maxSize": "500 kB" }
+  ],
+  "importRules": {
+    "map": "only in src/components/Map/DeckOverlay.tsx and src/components/Map/MapView.tsx",
+    "chart": "only in src/components/charts/ChartPane.tsx and src/components/Map/CrossingsChart.tsx",
+    "framer-motion": "dynamic import() only in src/components/Market/TickerMarquee.tsx and src/components/Research/TracePanel.tsx",
+    "radix": "only @radix-ui/react-hover-card 1.1.2 in src/components/EvidenceChip.tsx",
+    "d3": "only d3-scale, d3-array, d3-hierarchy via named imports, never import * as d3"
+  },
+  "engines": {
+    "node": ">=20.18.0",
+    "pnpm": "9.12.3"
+  }
+}

@@ -55,6 +55,14 @@ def map_all():
     return map_service.get_all_maps()
 
 
+@router.get("/api/map/layers/{feed}")
+def map_layer(feed: str):
+    """Cheap map toggles (no new screens): weather/disaster/aviation dots."""
+    from backend.services import layers_service
+
+    return layers_service.get_layer(feed)
+
+
 @router.get("/api/map/{chokepoint_id}")
 def map_one(chokepoint_id: str):
     from backend.services import map_service
@@ -98,14 +106,6 @@ def geo(layer: str):
         return blob
     except Exception as e:
         return {"type": "FeatureCollection", "features": [], "status": "skipped", "reason": str(e)}
-
-
-@router.get("/api/map/layers/{feed}")
-def map_layer(feed: str):
-    """Cheap map toggles (no new screens): weather/disaster/aviation dots."""
-    from backend.services import layers_service
-
-    return layers_service.get_layer(feed)
 
 
 @router.websocket("/ws/map/{chokepoint_id}")

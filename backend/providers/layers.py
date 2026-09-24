@@ -71,9 +71,12 @@ def earthquakes(days: int = 7, min_mag: float = 4.5) -> dict:
     key = cache_key("layers", "earthquakes", {"d": days, "m": min_mag}, TTL)
 
     def fetch():
+        from datetime import datetime, timedelta, timezone
+
+        start = (datetime.now(timezone.utc) - timedelta(days=days)).strftime("%Y-%m-%d")
         r = requests.get(
             "https://earthquake.usgs.gov/fdsnws/event/1/query",
-            params={"format": "geojson", "starttime": f"{days * -1}days", "minmagnitude": min_mag, "limit": 100},
+            params={"format": "geojson", "starttime": start, "minmagnitude": min_mag, "limit": 100},
             timeout=15,
         )
         r.raise_for_status()

@@ -61,7 +61,7 @@ def get_asset(ticker: str) -> dict:
     from backend.services._evidence import collect
 
     evidence = collect(q, chart, fund, filings, insider, news, trends, asking, phys)
-    return {
+    out = {
         "ticker": ticker, "quote": q, "chart": chart, "fundamentals": fund,
         "filings": filings, "insider": insider, "news_timeline": news,
         "trends": trends,
@@ -69,6 +69,7 @@ def get_asset(ticker: str) -> dict:
         "rising_queries_badge": rising[:5] if isinstance(rising, list) else rising,
         "regional_interest_strip": regional[:5] if isinstance(regional, list) else regional,
         "what_people_are_asking": asking,
-        "physical corroboration": phys,
+        "physical_corroboration": phys,
         "evidence": evidence,
     }
+    return out

@@ -27,7 +27,19 @@ def quote(ticker: str) -> dict:
         tk = yf.Ticker(sym)
         info = {}
         try:
-            info = {"price": tk.fast_info.get("last_price"), "prev_close": tk.fast_info.get("previous_close")}
+            fi = tk.fast_info
+            # fast_info keys are camelCase (lastPrice, previousClose); be tolerant.
+            def _g(*names):
+                for n in names:
+                    try:
+                        v = fi.get(n)
+                    except Exception:
+                        v = None
+                    if v is not None:
+                        return v
+                return None
+            info = {"price": _g("last_price", "lastPrice", "regularMarketPrice"),
+                    "prev_close": _g("previous_close", "previousClose", "regularMarketPreviousClose")}
         except Exception as e:
             info = {"error": str(e)}
         return make_record("yfinance", "quote", info, entity_id=ticker)
@@ -35,14 +47,30 @@ def quote(ticker: str) -> dict:
     return get_or_fetch(key, TTL, fetch)
 
 
+def _normalize_range(range_: str) -> str:
+    """Map UI/AV ranges ('1m','3m','6m') to yfinance periods ('1mo','3mo','6mo')."""
+    alias = {"1m": "1mo", "3m": "3mo", "6m": "6mo"}
+    r = (range_ or "3mo").strip()
+    return alias.get(r, r)
+
+
 def historical(ticker: str, range_: str = "3mo") -> dict:
     sym = _yf(ticker)
+    range_ = _normalize_range(range_)
     key = cache_key("yf", "historical", {"t": sym, "r": range_}, 4 * 3600)
 
     def fetch():
         import yfinance as yf
 
+        from backend.providers.chart_rows import dataframe_to_rows
+
         df = yf.Ticker(sym).history(period=range_)
-        return make_record("yfinance", "historical", {"rows": len(df), "tail": df.tail(5).to_dict() if len(df) else {}}, entity_id=ticker)
+        rows = dataframe_to_rows(df) if df is not None and len(df) else []
+        return make_record(
+            "yfinance",
+            "historical",
+            {"rows": rows, "tail": rows[-5:] if rows else []},
+            entity_id=ticker,
+        )
 
     return get_or_fetch(key, 4 * 3600, fetch)

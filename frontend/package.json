@@ -1,0 +1,96 @@
+{
+  "name": "aaj-terminal-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:contract": "vitest run tests/contract.test.ts",
+    "test:socket-kill": "playwright test tests/e2e/hero1.spec.ts",
+    "bundlesize": "bundlesize"
+  },
+  "dependencies": {
+    "@deck.gl/aggregation-layers": "9.1.14",
+    "@deck.gl/core": "9.1.14",
+    "@deck.gl/extensions": "9.1.14",
+    "@deck.gl/layers": "9.1.14",
+    "@deck.gl/mapbox": "9.1.14",
+    "@tanstack/react-query": "5.90.2",
+    "class-variance-authority": "0.7.1",
+    "clsx": "2.1.1",
+    "date-fns": "3.6.0",
+    "lightweight-charts": "5.0.8",
+    "lucide-react": "0.469.0",
+    "maplibre-gl": "5.5.0",
+    "motion": "^12.23.12",
+    "motion-dom": "^12.23.28",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-map-gl": "8.0.4",
+    "react-markdown": "9.0.1",
+    "react-router-dom": "7.1.5",
+    "rehype-sanitize": "6.0.0",
+    "remark-gfm": "4.0.1",
+    "tailwind-merge": "3.3.1",
+    "zod": "3.23.8"
+  },
+  "optionalDependencies": {
+    "framer-motion": "^12.23.28"
+  },
+  "devDependencies": {
+    "@fontsource/geist": "5.1.0",
+    "@fontsource/geist-mono": "5.1.0",
+    "@playwright/test": "^1.63.0",
+    "@radix-ui/react-hover-card": "1.1.2",
+    "@tailwindcss/vite": "4.1.3",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "16.2.0",
+    "@testing-library/user-event": "^14.6.7",
+    "@types/maplibre-gl": "1.14.0",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@vitejs/plugin-react": "4.3.4",
+    "bundlesize": "0.18.1",
+    "d3-array": "3.2.4",
+    "d3-hierarchy": "3.1.2",
+    "d3-scale": "4.0.2",
+    "jsdom": "^30.1.1",
+    "msw": "2.7.4",
+    "playwright": "1.51.0",
+    "tailwindcss": "4.1.3",
+    "typescript": "5.7.3",
+    "vite": "8.0.4",
+    "vitest": "3.1.3"
+  },
+  "bundlesize": [
+    {
+      "path": "dist/assets/vendor-*.js",
+      "maxSize": "80 kB"
+    },
+    {
+      "path": "dist/assets/map-*.js",
+      "maxSize": "180 kB"
+    },
+    {
+      "path": "dist/assets/chart-*.js",
+      "maxSize": "30 kB"
+    },
+    {
+      "path": "dist/assets/*.js",
+      "maxSize": "500 kB"
+    }
+  ],
+  "packageManager": "pnpm@9.12.3",
+  "engines": {
+    "node": ">=20.18.0",
+    "pnpm": "9.12.3"
+  },
+  "overrides": {
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  }
+}

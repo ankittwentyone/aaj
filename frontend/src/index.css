@@ -1,0 +1,467 @@
+@import "tailwindcss";
+
+/* ─────────────────────────────────────────
+   @theme — single source of truth (Tailwind v4)
+   Forwarded to :root for JS access via var()
+   ───────────────────────────────────────── */
+@theme {
+  /* Surfaces */
+  --color-canvas: #09090B;        /* zinc-950 — page bg */
+  --color-panel: #111113;         /* card / drawer */
+  --color-raised: #18181B;        /* input / elevated */
+  --color-hover: #1E1E22;         /* hover bg */
+  --color-overlay: rgba(9, 9, 11, 0.72);
+
+  /* Borders */
+  --color-border-subtle: #232327;
+  --color-border-default: #2E2E34;
+  --color-border-strong: #3F3F47;
+
+  /* Text */
+  --color-ink: #FAFAFA;
+  --color-ink-muted: #A1A1AA;
+  --color-ink-dim: #52525B;
+  --color-ink-faint: #3F3F47;
+
+  /* Voltage (accent) — monochrome */
+  --color-voltage: #FFFFFF;
+  --color-voltage-foreground: #09090B;
+  --color-voltage-dim: rgba(255, 255, 255, 0.08);
+  --color-voltage-border: rgba(255, 255, 255, 0.18);
+  --color-ring: #FFFFFF;
+
+  /* Semantic */
+  --color-success: #4ADE80;
+  --color-success-dim: rgba(74, 222, 128, 0.10);
+  --color-success-border: rgba(74, 222, 128, 0.24);
+
+  --color-danger: #FF4444;
+  --color-danger-dim: rgba(255, 68, 68, 0.10);
+  --color-danger-border: rgba(255, 68, 68, 0.28);
+
+  --color-warning: #F59E0B;
+  --color-warning-dim: rgba(245, 158, 11, 0.12);
+  --color-warning-border: rgba(245, 158, 11, 0.28);
+
+  --color-info: #60A5FA;
+  --color-info-dim: rgba(96, 165, 250, 0.10);
+  --color-info-border: rgba(96, 165, 250, 0.24);
+
+  /* Typography */
+  --font-sans: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, "Cascadia Code", monospace;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  /* Motion */
+  --motion-view: 0.22s;
+  --motion-fast: 120ms;
+  --motion-base: 180ms;
+  --motion-slow: 320ms;
+  --ease-default: cubic-bezier(0.25, 0.1, 0.25, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Z */
+  --z-header: 40;
+  --z-nav: 45;
+  --z-overlay: 50;
+  --z-drawer: 55;
+  --z-toast: 60;
+  --z-cmdk: 70;
+}
+
+/* ── :root forwards (JS-readable) ── */
+:root {
+  --canvas: var(--color-canvas);
+  --panel: var(--color-panel);
+  --raised: var(--color-raised);
+  --hover: var(--color-hover);
+  --overlay: var(--color-overlay);
+
+  --border-subtle: var(--color-border-subtle);
+  --border-default: var(--color-border-default);
+  --border-strong: var(--color-border-strong);
+
+  --ink: var(--color-ink);
+  --ink-muted: var(--color-ink-muted);
+  --ink-dim: var(--color-ink-dim);
+  --ink-faint: var(--color-ink-faint);
+
+  --voltage: var(--color-voltage);
+  --voltage-fg: var(--color-voltage-foreground);
+  --voltage-dim: var(--color-voltage-dim);
+  --voltage-border: var(--color-voltage-border);
+
+  --success: var(--color-success);
+  --success-dim: var(--color-success-dim);
+  --danger: var(--color-danger);
+  --danger-dim: var(--color-danger-dim);
+  --warning: var(--color-warning);
+  --warning-dim: var(--color-warning-dim);
+  --info: var(--color-info);
+  --info-dim: var(--color-info-dim);
+}
+
+/* ── Base ── */
+* { font-variant-numeric: tabular-nums; }
+
+html {
+  background: var(--canvas);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  scrollbar-gutter: stable;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: var(--canvas);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+#root { min-height: 100vh; }
+
+/* ── Full-bleed terminal shell (no centered postcard) ── */
+.terminal-shell {
+  width: 100%;
+  min-height: calc(100vh - 52px);
+  min-height: calc(100dvh - 52px);
+  display: flex;
+  flex-direction: column;
+}
+.terminal-page {
+  width: 100%;
+  max-width: none;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  box-sizing: border-box;
+}
+
+/* ── Map page: full-bleed MapLibre + deck.gl ── */
+.terminal-map {
+  /* Slightly lifted from pure black so raster tiles read before first paint */
+  background: #2a2a32;
+}
+.terminal-map .maplibregl-map,
+.terminal-map .maplibregl-canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+.terminal-map .maplibregl-ctrl-bottom-left {
+  margin: 0 0 1rem 0.75rem;
+}
+.terminal-map .maplibregl-ctrl-group {
+  background: color-mix(in srgb, var(--panel) 92%, transparent);
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.terminal-map .maplibregl-ctrl-group button {
+  width: 32px;
+  height: 32px;
+}
+.terminal-map .maplibregl-ctrl-attrib {
+  background: color-mix(in srgb, var(--panel) 85%, transparent) !important;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  font-size: 9px;
+  color: var(--ink-dim);
+  margin-top: 0.35rem;
+  max-width: min(280px, 50vw);
+}
+@media (min-width: 1024px) {
+  .terminal-page { padding: 0.75rem 1.25rem; }
+}
+
+/* ── Research report markdown (no @tailwindcss/typography — custom terminal prose) ── */
+.report-shell {
+  background: linear-gradient(180deg, color-mix(in srgb, var(--color-panel) 96%, #fff 4%) 0%, var(--color-panel) 120px);
+}
+.report-md {
+  color: var(--color-ink);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  max-width: 72ch;
+}
+.report-md__h1 {
+  font-size: 1.35rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin: 0 0 1.25rem;
+  line-height: 1.25;
+}
+.report-md__h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--color-ink-muted);
+  margin: 2rem 0 0.75rem;
+  padding-top: 0.25rem;
+}
+.report-md__h2-bar {
+  width: 3px;
+  height: 1.1em;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #f59e0b, #fbbf24);
+  flex-shrink: 0;
+}
+.report-md__h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 1.25rem 0 0.5rem;
+  color: var(--color-ink);
+}
+.report-md__p {
+  margin: 0 0 0.85rem;
+  color: color-mix(in srgb, var(--color-ink) 92%, var(--color-ink-muted));
+}
+.report-md__ul,
+.report-md__ol {
+  margin: 0 0 1rem 1.1rem;
+  padding: 0;
+}
+.report-md__li {
+  margin-bottom: 0.4rem;
+}
+.report-md__li::marker {
+  color: var(--color-warning);
+}
+.report-md__strong {
+  color: var(--color-ink);
+  font-weight: 600;
+}
+.report-md__link {
+  color: var(--color-info);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.report-md__quote {
+  margin: 1rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 3px solid var(--color-border-strong);
+  background: var(--color-raised);
+  border-radius: 0 8px 8px 0;
+  color: var(--color-ink-muted);
+  font-size: 0.875rem;
+}
+.report-md__code {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  background: var(--color-raised);
+  border: 1px solid var(--color-border-subtle);
+}
+.report-md__hr {
+  border: none;
+  border-top: 1px solid var(--color-border-subtle);
+  margin: 2rem 0;
+}
+
+.terminal-grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+@media (min-width: 1024px) {
+  .terminal-grid-12 { gap: 1rem; }
+}
+.terminal-panel {
+  background: var(--color-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+.terminal-panel--flush {
+  padding: 0;
+  overflow: hidden;
+}
+.terminal-panel__head {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+.terminal-breakout {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+}
+
+/* ── Scrollbar (dark only, hairline) ── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--panel); }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--ink-dim); }
+::-webkit-scrollbar-corner { background: var(--panel); }
+
+/* ── Glass — ONLY terminal-card + Cmd+K ── */
+.terminal-card,
+.cmdk-panel {
+  background: rgba(17, 17, 19, 0.72); /* panel at 72% */
+  backdrop-filter: blur(18px) saturate(1.2);
+  -webkit-backdrop-filter: blur(18px) saturate(1.2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+}
+
+/* ── Terminal header — 52px, SOLID (no blur) per aesthetic lock ── */
+.terminal-header {
+  height: 52px;
+  background: var(--canvas);
+  border-bottom: 1px solid var(--border-subtle);
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+}
+.terminal-header h1 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+.terminal-header p {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+/* ── Risk pill — single geometry, 4 ramps ── */
+.risk-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: 1;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.risk-pill--critical { background: var(--color-danger-dim); color: var(--color-danger); border-color: var(--color-danger-border); }
+.risk-pill--high     { background: var(--color-warning-dim); color: var(--color-warning); border-color: var(--color-warning-border); }
+.risk-pill--low      { background: var(--color-success-dim); color: var(--color-success); border-color: var(--color-success-border); }
+.risk-pill--info     { background: var(--color-info-dim); color: var(--color-info); border-color: var(--color-info-border); }
+.risk-pill--stale    { background: transparent; color: var(--ink-dim); border-color: var(--border-default); }
+.risk-pill--sm { padding: 3px 8px; font-size: 10px; letter-spacing: 0.08em; }
+
+/* ── Evidence hover — normalized ── */
+.evidence-row {
+  border-bottom: 1px solid var(--border-subtle);
+  transition: background var(--motion-fast) var(--ease-default);
+}
+.evidence-row:hover,
+.evidence-row:focus-visible {
+  background: var(--hover);
+  color: var(--ink);
+}
+.evidence-row--danger:hover {
+  background: var(--danger-dim);
+  color: var(--danger);
+}
+
+/* ── Pulse bar (for live strips) ── */
+@keyframes pulse-bar {
+  0%, 100% { transform: scaleY(0.4); opacity: 0.4; }
+  50%       { transform: scaleY(1);   opacity: 1; }
+}
+.pulse-bar {
+  height: 8px;
+  background: var(--border-subtle);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.pulse-bar__fill {
+  height: 100%;
+  width: 40%;
+  background: var(--ink);
+  border-radius: 6px;
+  animation: pulse-bar 1.2s ease-in-out infinite;
+}
+
+/* ── View motion (route enter) ── */
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.view-motion { animation: view-enter var(--motion-view) var(--ease-out) both; }
+
+/* ── Mono numeric utility ── */
+.mono, [data-numeric], .price, .count, .pct {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ── Focus ring ── */
+*:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+}
+
+/* ── Marketing shell — scoped light tokens (for / only) ── */
+.marketing-shell {
+  --m-canvas: #FFFFFF;
+  --m-panel: #FAFAFA;
+  --m-raised: #F5F5F7;
+  --m-border: #E5E5E7;
+  --m-ink: #18181B;
+  --m-ink-muted: #71717A;
+  --m-ink-dim: #A1A1AA;
+  --m-voltage: #09090B;
+  --m-voltage-fg: #FFFFFF;
+  --m-success: #16A34A;
+  --m-danger: #DC2626;
+  --m-radius-lg: 12px;
+  --m-shadow: 0 4px 24px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --m-shadow-hover: 0 8px 32px rgba(0,0,0,0.10);
+  background: var(--m-canvas);
+  color: var(--m-ink);
+  font-family: var(--font-sans);
+}
+.marketing-shell .marketing-card {
+  background: var(--m-panel);
+  border: 1px solid var(--m-border);
+  border-radius: var(--m-radius-lg);
+  box-shadow: var(--m-shadow);
+}
+.marketing-shell .marketing-cta {
+  background: var(--m-voltage);
+  color: var(--m-voltage-fg);
+  border-radius: var(--radius-pill);
+}
+
+/* ── Motion safety ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Print (minimal, not hybrid) ── */
+@media print {
+  @page { margin: 12mm; size: A4; }
+  html, body { background: white !important; color: black !important; }
+  .terminal-card { background: white !important; border: 1px solid #ddd !important; backdrop-filter: none !important; }
+  header, footer, .mobile-bottom-nav, .cmdk-panel { display: none !important; }
+}

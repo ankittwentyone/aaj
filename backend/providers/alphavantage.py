@@ -57,15 +57,20 @@ def quote(ticker: str) -> dict:
     key = cache_key("av", "quote", {"t": sym}, TTL_QUOTE)
 
     def fetch():
-        raw = _call({"function": "GLOBAL_QUOTE", "symbol": sym})
-        if _av_error(raw):
+        try:
+            raw = _call({"function": "GLOBAL_QUOTE", "symbol": sym})
+        except Exception:
+            raw = None
+        if _av_error(raw) or not (isinstance(raw, dict) and raw.get("Global Quote")):
+            # AV returns {} for Yahoo-style symbols (e.g. BZ=F) and rate-limit
+            # Information dicts on exhausted quota — fall back to yfinance (keyless).
             from backend.providers import yfinance_provider
 
             try:
                 return yfinance_provider.quote(ticker)
             except Exception:
                 pass
-        return make_record("alphavantage", "quote", raw, entity_id=ticker)
+        return make_record("alphavantage", "quote", raw if isinstance(raw, dict) else {"error": "alphavantage unreachable"}, entity_id=ticker)
 
     return get_or_fetch(key, TTL_QUOTE, fetch)
 
@@ -76,15 +81,33 @@ def historical(ticker: str, range_: str = "3m") -> dict:
     key = cache_key("av", "historical", {"t": sym, "r": range_}, TTL_HIST)
 
     def fetch():
-        raw = _call({"function": fn, "symbol": sym, "outputsize": "compact"})
+        try:
+            raw = _call({"function": fn, "symbol": sym, "outputsize": "compact"})
+        except Exception:
+            raw = None
         if _av_error(raw):
             from backend.providers import yfinance_provider
 
             try:
-                return yfinance_provider.historical(ticker)
+                return yfinance_provider.historical(ticker, range_)
             except Exception:
                 pass
-        return make_record("alphavantage", "historical", {"range": range_, "raw": raw}, entity_id=ticker)
+        from backend.providers.chart_rows import parse_av_time_series
+
+        rows = parse_av_time_series(raw if isinstance(raw, dict) else {})
+        if not rows:
+            # AV returns {} for Yahoo-style symbols (e.g. BZ=F) or unrecognized
+            # shapes without an Error Message — fall back to yfinance (keyless).
+            from backend.providers import yfinance_provider
+
+            try:
+                return yfinance_provider.historical(ticker, range_)
+            except Exception:
+                pass
+        payload = {"range": range_, "rows": rows, "tail": rows[-5:] if rows else []}
+        if not rows and isinstance(raw, dict):
+            payload["raw"] = raw
+        return make_record("alphavantage", "historical", payload, entity_id=ticker)
 
     return get_or_fetch(key, TTL_HIST, fetch)
 

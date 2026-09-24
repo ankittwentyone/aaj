@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import os
 import pathlib
-import sqlite3
 import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
@@ -50,6 +49,15 @@ AV_RECORDS = [
 ]
 
 
+def _is_av_error(payload: object) -> bool:
+    return isinstance(payload, dict) and ("Error Message" in payload or "Information" in payload)
+
+
+# SerpApi wire engine differs from our dataset label: organic search wire is
+# "google". Verified live 2026-09-24: wire "google_search" 400s.
+SERPAPI_WIRE = {"google_search": "google"}
+
+
 def record_raw() -> dict:
     from backend.cache.replay import record_key
     from backend.providers.serpapi import SerpApiKeyPool
@@ -60,19 +68,28 @@ def record_raw() -> dict:
         pool = SerpApiKeyPool()
         for engine, params in SERPAPI_RECORDS:
             try:
-                records["serpapi"][record_key("serpapi", {"engine": engine, **params})] = pool.call(engine, params)
+                wire = SERPAPI_WIRE.get(engine, engine)
+                payload = pool.call(wire, params)
+                if isinstance(payload, dict) and payload.get("error"):
+                    print(f"  SKIP serpapi {engine} {params.get('q')}: {payload.get('error')}")
+                    continue
+                records["serpapi"][record_key("serpapi", {"engine": engine, **params})] = payload
                 print(f"  recorded serpapi {engine} {params.get('q')}")
             except Exception as e:
                 print(f"  SKIP serpapi {engine} {params.get('q')}: {e}")
     except Exception as e:
         print(f"  serpapi pool unavailable: {e}")
-    # AV raws (live _call)
+    # AV raws (live _call) — skip rate-limit/error payloads so replay never poisons
     try:
         from backend.providers import alphavantage
 
         for params in AV_RECORDS:
             try:
-                records["av"][record_key("av", params)] = alphavantage._call(dict(params))  # noqa: SLF001
+                payload = alphavantage._call(dict(params))  # noqa: SLF001
+                if _is_av_error(payload):
+                    print(f"  SKIP av {params.get('function')} {params.get('symbol', '')}: rate-limited/error, not recording")
+                    continue
+                records["av"][record_key("av", params)] = payload
                 print(f"  recorded av {params.get('function')} {params.get('symbol', '')}")
             except Exception as e:
                 print(f"  SKIP av {params}: {e}")
@@ -118,6 +135,11 @@ def main() -> None:
 
     mock = os.environ.get("MOCK_MODE", "").lower() == "true"
     blob: dict = {}
+    if not mock:
+        # Record raw provider responses FIRST while AV quota is fresh; service
+        # calls after may rate-limit and fall back to yfinance honestly.
+        print("live mode: recording raw provider responses ...")
+        blob["records"] = record_raw()
     blob["market-home"] = market_home_service.get_home()
     blob["asset/BRENT"] = asset_service.get_asset("BRENT")
     blob["asset/AAPL"] = asset_service.get_asset("AAPL")
@@ -130,26 +152,23 @@ def main() -> None:
     blob["layers/weather"] = layers_service.get_layer("weather")
     if mock:
         print("MOCK_MODE=true: validating endpoints against replay (no recording)")
-    else:
-        print("live mode: recording raw provider responses ...")
-        blob["records"] = record_raw()
 
     def default(o):
         return str(o)
 
-    OUT.write_text(json.dumps(blob, default=default, indent=1)[:2_000_000])
+    def sanitize(o):
+        if isinstance(o, dict):
+            return {str(k): sanitize(v) for k, v in o.items()}
+        if isinstance(o, (list, tuple)):
+            return [sanitize(v) for v in o]
+        return o
+
+    OUT.write_text(json.dumps(sanitize(blob), default=default, indent=1)[:2_000_000])
     print(f"wrote {OUT} ({OUT.stat().st_size} bytes)")
     try:
-        from backend.providers.aisstream import _db, load_chokepoints  # noqa: SLF001
+        from backend.services.warmup import backfill_db_from_seed
 
-        load_chokepoints()
-        seed = json.loads((ROOT / "backend" / "data" / "seed_baseline.json").read_text())
-        c: sqlite3.Connection = _db()
-        for cid, row in seed.items():
-            c.execute("INSERT OR IGNORE INTO traffic_hour(chokepoint_id,ts,vessel_count,tanker_count,cargo_count) VALUES(?,?,?,0,0)", (cid, "2026-09-10T00:00:00Z", row["baseline_7d"]))
-        c.commit()
-        c.close()
-        print("db backfilled from seed")
+        print(backfill_db_from_seed())
     except Exception as e:
         print(f"db backfill skipped: {e}")
 
